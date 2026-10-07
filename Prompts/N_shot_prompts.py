@@ -114,3 +114,15 @@ Please predict the numerical value for the given molecule.
 Format your output exactly as a single number.
 Example output: 1.23
 """
+
+
+BACE_r_prompt_N_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
+
+Task: Predict the Beta-site Amyloid Precursor Protein Cleaving Enzyme 1 (BACE1) binding affinity (pIC50) of the molecule.
+You will be provided with example molecules and their continuous numerical values.
+
+Please predict the numerical value for the given molecule.
+Format your output exactly as a single number.
+Example output: 6.54
+"""
