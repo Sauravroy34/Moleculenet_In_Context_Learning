@@ -139,7 +139,7 @@ def create_prompt(input_smiles, name, examples=None):
         return prompt
 
 
-def metric_eval(task,df):
+def metric_eval(task,df , name):
 
     if task == "classification":
         confidences_yes = df["confidence_yes"].to_list()
@@ -159,7 +159,7 @@ def metric_eval(task,df):
 
         f1 = f1_score(true,prediction)
 
-        return {"auc": auc,"accuracy": accuracy,"f1_score":f1}
+        return {"name":name, "roc_auc": auc,"accuracy": accuracy,"f1_score":f1}
 
 
     if task == "regression":
@@ -172,7 +172,7 @@ def metric_eval(task,df):
         rmse = root_mean_squared_error(true,predicted)
         
 
-        return {"rmse": rmse}
+        return {"name":name, "rmse": rmse}
 
 
 
