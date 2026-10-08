@@ -2,7 +2,7 @@
 # Zero-Shot Prompts
 # -----------------------------------------------------------------------------
 
-BBBP_prompt_zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+BBBP_prompt_Zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
 Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
 
 Task: Predict whether the molecule has blood-brain barrier penetration capability.
@@ -15,7 +15,7 @@ Example output: Yes, 0.85
 """
 
 
-BACE_prompt_zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+BACE_prompt_Zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
 Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
 
 Task: Predict whether the molecule can inhibit Beta-site Amyloid Precursor Protein Cleaving Enzyme 1 (BACE1).
@@ -28,7 +28,7 @@ Example output: Yes, 0.85
 """
 
 
-Tox21_prompt_zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+Tox21_prompt_Zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
 Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
 
 Task: Predict whether the molecule is toxic.
@@ -41,7 +41,7 @@ Example output: Yes, 0.85
 """
 
 
-HIV_prompt_zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SELFIES string representation.
+HIV_prompt_Zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SELFIES string representation.
 Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
 
 Task: Predict whether the molecule can inhibit HIV replication.
@@ -54,7 +54,7 @@ Example output: Yes, 0.85
 """
 
 
-ClinTox_prompt_zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+ClinTox_prompt_Zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
 Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
 
 Task: Predict whether the molecule is clinically-trial-toxic or FDA approved.
@@ -67,7 +67,7 @@ Example output: Yes, 0.85
 """
 
 
-SIDER_prompt_zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+SIDER_prompt_Zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
 Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
 
 Task: Predict whether the molecule has specific adverse drug reactions or side effects.
@@ -82,7 +82,7 @@ Example output: Yes, 0.85
 
 # Regression Prompts (Zero-Shot)
 
-ESOL_prompt_zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+ESOL_prompt_Zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
 Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
 
 Task: Predict the water solubility (log solubility in mols per litre) of the molecule.
@@ -93,7 +93,7 @@ Example output: -3.14
 """
 
 
-FreeSolv_prompt_zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+FreeSolv_prompt_Zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
 Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
 
 Task: Predict the hydration free energy (in kcal/mol) of the molecule in water.
@@ -104,7 +104,7 @@ Example output: -2.54
 """
 
 
-Lipophilicity_prompt_zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+Lipophilicity_prompt_Zero_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
 Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
 
 Task: Predict the octanol/water distribution coefficient (logD at pH 7.4) of the molecule.
