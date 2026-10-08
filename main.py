@@ -1,5 +1,6 @@
 from ast import Pass
 import random
+import os
 import time
 import pandas as pd 
 import deepchem as dc
@@ -42,7 +43,6 @@ TASK_MAP = {
     "classification": ["bace_c" , "bbbp" , "tox21" , "hiv" , "clintox" , "sider"],
     "regression": ["bace_r", "esol" , "freesolv" , "lipo"]
 }
-
 
 
 
@@ -139,7 +139,7 @@ def create_prompt(input_smiles, name, examples=None):
         return prompt
 
 
-def metric_eval(task,df , name):
+def metric_eval(task,df , name , model_name):
 
     if task == "classification":
         confidences_yes = df["confidence_yes"].to_list()
@@ -159,7 +159,7 @@ def metric_eval(task,df , name):
 
         f1 = f1_score(true,prediction)
 
-        return {"name":name, "roc_auc": auc,"accuracy": accuracy,"f1_score":f1}
+        return {"model_name":model_name,"name":name, "roc_auc": auc,"accuracy": accuracy,"f1_score":f1}
 
 
     if task == "regression":
@@ -172,7 +172,7 @@ def metric_eval(task,df , name):
         rmse = root_mean_squared_error(true,predicted)
         
 
-        return {"name":name, "rmse": rmse}
+        return {"model_name":model_name,"name":name, "rmse": rmse}
 
 
 
@@ -197,7 +197,9 @@ def single_run(name: str, k: int, SEED: int, model: ModelInterface):
     
     test_df = test.to_dataframe()
     test_df = test_df[test_df["w"] > 0]
-        
+
+    test_df = test_df.head(1)
+
     for i in tqdm(range(len(test_df))):
         input_smiles = test_df.iloc[i]["ids"]
         true_label = test_df.iloc[i]["y"]
@@ -242,6 +244,6 @@ def single_run(name: str, k: int, SEED: int, model: ModelInterface):
         prediction.append(to_append)
 
     out_df = pd.DataFrame(prediction, columns=columns)
-    metrics = metric_eval(task, out_df)
+    metrics = metric_eval(task = task, df = out_df,name = name , model_name = model.model_name)
 
     return out_df, metrics
