@@ -8,8 +8,12 @@ from openai import OpenAI
 import litellm
 from langfuse import get_client, propagate_attributes
 import pandas as pd
+from dotenv import load_dotenv
 
 from Prompts.prompts import build_messages, output_schema, system_text, task_keys
+
+# Load environment variables from .env file
+load_dotenv(override=True)
 
 litellm.drop_params = True
 
@@ -63,10 +67,6 @@ class LiteLLMModel(ModelInterface):
             "messages": messages,
             "temperature": self.kwargs.get("temperature", 0.0),
         }
-        
-        # Responses API (Structured Outputs) for OpenAI models
-        if provider == 'openai':
-            completion_kwargs["response_format"] = json_response_format(dataset_name)
             
         for attempt in range(self.max_retries):
             try:
@@ -98,7 +98,6 @@ def submit_batch_openai(model_name: str, dataset_name: str, requests: list, batc
                 "body": {
                     "model": bare_model(model_name),
                     "messages": msgs,
-                    "response_format": json_response_format(dataset_name),
                     "temperature": 0.0,
                 }
             }
