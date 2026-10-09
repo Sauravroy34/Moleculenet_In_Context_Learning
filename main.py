@@ -1,249 +1,157 @@
-from ast import Pass
+import argparse
 import random
 import os
 import time
-import pandas as pd 
-import deepchem as dc
+import pandas as pd
 from tqdm import tqdm
-from litellm import completion
+from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, f1_score
+
 from DataLoader.loader import load_datsets
-from Prompts.N_shot_prompts import BBBP_prompt_N_shot, BACE_prompt_N_shot, Tox21_prompt_N_shot, HIV_prompt_N_shot, ClinTox_prompt_N_shot, SIDER_prompt_N_shot, ESOL_prompt_N_shot, FreeSolv_prompt_N_shot, Lipophilicity_prompt_N_shot, BACE_r_prompt_N_shot
-from Prompts.Zero_shot_prompts import BBBP_prompt_Zero_shot, BACE_prompt_Zero_shot, Tox21_prompt_Zero_shot, HIV_prompt_Zero_shot, ClinTox_prompt_Zero_shot, SIDER_prompt_Zero_shot, ESOL_prompt_Zero_shot, FreeSolv_prompt_Zero_shot, Lipophilicity_prompt_Zero_shot, BACE_r_prompt_Zero_shot
-from sklearn.metrics import roc_auc_score, accuracy_score, root_mean_squared_error, f1_score
+from Prompts.Dataset_task_map import DATASETS
+from Prompts.prompts import build_messages, parse_response
+from backends import LiteLLMModel, provider_of, submit_batch_openai, submit_batch_anthropic
 
 SEED = 42
 
-N_SHOT_MAP = {
-    "bace_c" : BACE_prompt_N_shot,
-    "bace_r" : BACE_r_prompt_N_shot,
-    "bbbp": BBBP_prompt_N_shot,
-    "tox21": Tox21_prompt_N_shot,
-    "hiv": HIV_prompt_N_shot,
-    "clintox": ClinTox_prompt_N_shot,
-    "sider": SIDER_prompt_N_shot,
-    "esol": ESOL_prompt_N_shot,
-    "freesolv": FreeSolv_prompt_N_shot,
-    "lipo": Lipophilicity_prompt_N_shot
-}
-
-ZERO_SHOT_MAP = {
-    "bace_c" : BACE_prompt_Zero_shot,
-    "bace_r" : BACE_r_prompt_Zero_shot,
-    "bbbp": BBBP_prompt_Zero_shot,
-    "tox21": Tox21_prompt_Zero_shot,
-    "hiv": HIV_prompt_Zero_shot,
-    "clintox": ClinTox_prompt_Zero_shot,
-    "sider": SIDER_prompt_Zero_shot,
-    "esol": ESOL_prompt_Zero_shot,
-    "freesolv": FreeSolv_prompt_Zero_shot,
-    "lipo": Lipophilicity_prompt_Zero_shot
-}
-
-TASK_MAP = {
-    "classification": ["bace_c" , "bbbp" , "tox21" , "hiv" , "clintox" , "sider"],
-    "regression": ["bace_r", "esol" , "freesolv" , "lipo"]
-}
-
-
-
-class ModelInterface:
-
-    def generate(self, prompt: str, n: int = 1, temperature: float = 0.7) -> list[str]:
-        raise NotImplementedError
-
-        
-
-
-
-
-class LiteLLMModel(ModelInterface):
+def metric_eval(task_type, df, dataset_name, model_name):
     """
-    Modular wrapper for models supported by litellm 
-    (OpenAI, Anthropic, HuggingFace, Cohere, vLLM, etc.)
+    Evaluate metrics for multi-task predictions.
+    df contains columns: ['task_key', 'true_label', 'predicted', ...]
+    We calculate per-task metrics and average them.
+    """
+    metrics = {"model_name": model_name, "dataset": dataset_name}
     
-    Usage examples:
-        model = LiteLLMModel(model_name="gpt-4")
-        model = LiteLLMModel(model_name="claude-3-opus-20240229")
-        model = LiteLLMModel(model_name="huggingface/meta-llama/Llama-2-7b-chat-hf")
-        model = LiteLLMModel(model_name="openai/custom-model", api_base="http://localhost:8000/v1")
-    """
-    def __init__(self, model_name: str, api_key: str = None, api_base: str = None, max_retries: int = 6, **kwargs):
-        self.model_name = model_name
-        self.api_key = api_key
-        self.api_base = api_base
-        self.max_retries = max_retries
-        self.kwargs = kwargs
-
-    def generate(self, prompt: str, n: int = 1, temperature: float = 0.7) -> list[str]:
-        outputs = []
-        for _ in range(n):
-            text = ""
-            for attempt in range(self.max_retries):
-                try:
-                    response = completion(
-                        model=self.model_name,
-                        messages=[{"role": "user", "content": prompt}],
-                        temperature=temperature,
-                        api_key=self.api_key,
-                        api_base=self.api_base,
-                        **self.kwargs
-                    )
-                    text = response.choices[0].message.content.strip()
-                    break
-                except Exception as e:
-                    print(f"API error on attempt {attempt+1}/{self.max_retries}: {e}")
-                    time.sleep(2) # Exponential backoff can be added here
-            outputs.append(text)
-            time.sleep(0.5)                         
-        return outputs
-
-
-# =====================================================================
-# Core Pipeline
-# =====================================================================
-
-def random_sample_examples(dataset, sample_size, task, SEED):
-    random.seed(SEED)
-    df = dataset.to_dataframe()
-
-    if task == "classification":
-        positive = df[(df["y"] == 1) & (df["w"] > 0)].sample(int(sample_size // 2), random_state=SEED)
-        negative = df[(df["y"] == 0) & (df["w"] > 0)].sample(int(sample_size // 2), random_state=SEED)
-
-        smiles = positive["ids"].tolist() + negative["ids"].tolist()
-        class_label = positive["y"].tolist() + negative["y"].tolist()
-        class_label = ["Yes" if i == 1 else "No" for i in class_label]
-
-        examples = list(zip(smiles, class_label))
-        return examples
-
-    if task == "regression":
-        examples = df[df["w"] > 0].sample(sample_size, random_state=SEED)
-        smiles = examples["ids"].tolist()
-        y = examples["y"].tolist()
-        examples = list(zip(smiles, y))
-        return examples
-
-
-def create_prompt(input_smiles, name, examples=None):
-    if examples is None:
-        prompt = ZERO_SHOT_MAP[name]
-        prompt += f"\nInput smiles: {input_smiles}\n"
-        return prompt
-    else:
-        prompt = N_SHOT_MAP[name]
-        for example in examples:
-            prompt += f"SMILES: {example[0]}\n"
-            prompt += f"Property: {example[-1]}\n"
-        prompt += f"SMILES: {input_smiles}\n"
-        return prompt
-
-
-def metric_eval(task,df , name , model_name):
-
-    if task == "classification":
-        confidences_yes = df["confidence_yes"].to_list()
-        labels = df["true_label"].apply(lambda x: 1 if x.lower() == "yes" else 0).to_list()
-
-        lables = [float(i) for i in labels]
-        confidences_yes = [float(i) for i in confidences_yes]
-
-        labels_ = labels * 100
-        confidences_yes_ = confidences_yes * 100
-        auc = roc_auc_score(labels_, confidences_yes_)
-       
-        prediction = df['Predicted'].apply(lambda x: 1 if x.lower() == "yes" else 0).to_list()
-        true = labels
-
-        accuracy = accuracy_score(true,prediction)
-
-        f1 = f1_score(true,prediction)
-
-        return {"model_name":model_name,"name":name, "roc_auc": auc,"accuracy": accuracy,"f1_score":f1}
-
-
-    if task == "regression":
-        predicted = df["Predicted"].tolist()
-        true = df["true_label"].tolist()
+    if task_type == "classification":
+        auc_list = []
+        acc_list = []
+        f1_list = []
         
-        predicted = [float(i) for i in predicted]
-        true = [float(i) for i in true]
-
-        rmse = root_mean_squared_error(true,predicted)
-        
-
-        return {"model_name":model_name,"name":name, "rmse": rmse}
-
-
-
-def single_run(name: str, k: int, SEED: int, model: ModelInterface):
-    task = None
-    for task_name, datasets in TASK_MAP.items():
-        if name in datasets:
-            task = task_name 
-            break
+        for task_key in df['task_key'].unique():
+            task_df = df[df['task_key'] == task_key].dropna(subset=['true_label'])
+            if len(task_df) == 0:
+                continue
+                
+            y_true = task_df['true_label'].astype(float).tolist()
+            # Predicted is probability for classification
+            y_pred_prob = task_df['predicted'].fillna(0.0).astype(float).tolist()
+            y_pred_class = [1 if p >= 0.5 else 0 for p in y_pred_prob]
             
-    if task is None:
-        raise ValueError(f"Unknown dataset: {name}. Available datasets: {list(ZERO_SHOT_MAP.keys())}")
+            try:
+                auc = roc_auc_score(y_true, y_pred_prob)
+                auc_list.append(auc)
+            except ValueError:
+                pass # Only one class present in true labels
+                
+            acc_list.append(accuracy_score(y_true, y_pred_class))
+            f1_list.append(f1_score(y_true, y_pred_class))
+            
+        metrics["roc_auc"] = sum(auc_list) / len(auc_list) if auc_list else 0.0
+        metrics["accuracy"] = sum(acc_list) / len(acc_list) if acc_list else 0.0
+        metrics["f1_score"] = sum(f1_list) / len(f1_list) if f1_list else 0.0
+        
+    elif task_type == "regression":
+        rmse_list = []
+        for task_key in df['task_key'].unique():
+            task_df = df[df['task_key'] == task_key].dropna(subset=['true_label'])
+            if len(task_df) == 0:
+                continue
+                
+            y_true = task_df['true_label'].astype(float).tolist()
+            y_pred = task_df['predicted'].fillna(0.0).astype(float).tolist()
+            
+            rmse = mean_squared_error(y_true, y_pred, squared=False)
+            rmse_list.append(rmse)
+            
+        metrics["rmse"] = sum(rmse_list) / len(rmse_list) if rmse_list else 0.0
+        
+    return metrics
 
-    train, valid, test = load_datsets(name)
 
-    if task == "classification":
-        columns = ["name", "k", "task", "smiles", "true_label", "Predicted", "confidence", "confidence_yes"]
-    else:
-        columns = ["name", "k", "task", "smiles", "true_label", "Predicted"]
-
-    prediction = []
+def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realtime", limit: int = None):
+    """
+    Run evaluation for a dataset using the specified model.
+    mode can be 'realtime' or 'batch'.
+    """
+    if name not in DATASETS:
+        raise ValueError(f"Unknown dataset: {name}. Available datasets: {list(DATASETS.keys())}")
+        
+    dataset_info = DATASETS[name]
+    task_type = dataset_info['type']
     
+    train, valid, test = load_datsets(name)
     test_df = test.to_dataframe()
-    test_df = test_df[test_df["w"] > 0]
-
-    test_df = test_df.head(1)
-
+    # Filter rows with at least one task weight > 0
+    test_df = test_df[test_df["w"].apply(lambda x: any(w > 0 for w in (x if hasattr(x, '__iter__') else [x])))]
+    
+    if limit:
+        test_df = test_df.head(limit)
+        
+    model = LiteLLMModel(model_name=model_name)
+    
+    prediction_records = []
+    batch_requests = []
+    
+    print(f"Starting {mode} run for {name} with k={k} using {model_name}...")
+    
     for i in tqdm(range(len(test_df))):
         input_smiles = test_df.iloc[i]["ids"]
-        true_label = test_df.iloc[i]["y"]
-
-        if task == "classification":
-            if true_label == 1:
-                true_label = "Yes"
-            else:
-                true_label = "No"
-
-        if k == 0:
-            prompts = create_prompt(input_smiles=input_smiles, name=name, examples=None)
-        else:
-            examples = random_sample_examples(dataset=train, sample_size=k, task=task, SEED=SEED)
-            prompts = create_prompt(input_smiles=input_smiles, name=name, examples=examples)
-
-        out = model.generate(prompts, n=1)
-        raw_output = out[0]
-
-        if task == "classification":
-            # Attempt to parse output formatted as [Yes/No], [Probability]
-            try:
-                parts = [p.strip() for p in raw_output.split(",")]
-                pred_label = parts[0]
-                conf = float(parts[1]) if len(parts) > 1 else 0.0
-                conf_yes = conf if pred_label.lower() == "yes" else 1.0 - conf
-            except Exception:
-                pred_label = "Error"
-                conf = 0.0
-                conf_yes = 0.0
-                
-            to_append = [name, k, task, input_smiles, true_label, pred_label, conf, conf_yes]
+        true_labels = test_df.iloc[i]["y"]
+        weights = test_df.iloc[i]["w"]
+        
+        if not hasattr(true_labels, '__iter__'):
+            true_labels = [true_labels]
+            weights = [weights]
             
+        messages = build_messages(name, train, input_smiles, k, SEED)
+        
+        if mode == "batch":
+            batch_requests.append(messages)
+            # Save truths for later
+            prediction_records.append({
+                "smiles": input_smiles,
+                "true_labels": true_labels,
+                "weights": weights
+            })
         else:
-            # Parse numerical output for regression
-            try:
-                pred_val = float(raw_output)
-            except Exception:
-                pred_val = 0.0
-            to_append = [name, k, task, input_smiles, true_label, pred_val]
+            # Realtime execution
+            raw_output = model.generate(name, messages)
+            preds, error = parse_response(name, raw_output)
+            
+            task_keys = list(dataset_info['tasks'].keys())
+            for idx, task_name in enumerate(task_keys):
+                if weights[idx] > 0: # Only record if measured
+                    prediction_records.append({
+                        "dataset": name,
+                        "k": k,
+                        "task_type": task_type,
+                        "smiles": input_smiles,
+                        "task_key": task_name,
+                        "true_label": true_labels[idx],
+                        "predicted": preds.get(task_name),
+                        "error": error
+                    })
+                    
+    if mode == "batch":
+        batch_id = f"batch_{name}_k{k}_{int(time.time())}"
+        provider = provider_of(model_name)
+        if provider == "openai":
+            api_batch_id = submit_batch_openai(model_name, name, batch_requests, batch_id)
+        elif provider == "anthropic":
+            api_batch_id = submit_batch_anthropic(model_name, name, batch_requests, batch_id)
+        else:
+            raise ValueError(f"Batch mode not supported for provider {provider}")
+            
+        print(f"Batch submitted successfully! API Batch ID: {api_batch_id}")
+        return pd.DataFrame(), {}
+        
+    else:
+        out_df = pd.DataFrame(prediction_records)
+        metrics = metric_eval(task_type, out_df, name, model_name)
+        return out_df, metrics
 
-        prediction.append(to_append)
 
-    out_df = pd.DataFrame(prediction, columns=columns)
-    metrics = metric_eval(task = task, df = out_df,name = name , model_name = model.model_name)
-
-    return out_df, metrics
+if __name__ == "__main__":
+    # Example test
+    # df, metrics = single_run("bbbp", k=5, SEED=SEED, model_name="gpt-4o", mode="realtime", limit=3)
+    # print(metrics)
+    pass

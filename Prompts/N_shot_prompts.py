@@ -1,8 +1,13 @@
 # Classification Prompts
 
-BBBP_prompt_N_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
-Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
+from .Dataset_task_map import DATASETS
 
+
+
+
+BBBP_prompt_N_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
+Use chain-of-thought reasoning to analyze the target molecule, and enclose your detailed thinking process within <thinking></thinking> tags.
+After your thinking process, provide the final answer in the following format:
 Task: Predict whether the molecule has blood-brain barrier penetration capability.
 You will be provided with example molecules and their binary labels: Yes (penetrative) or No (non-penetrative).
 
@@ -14,8 +19,7 @@ Example output: Yes, 0.85
 
 
 BACE_prompt_N_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
-Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
-
+Use chain-of-thought reasoning to analyze the target molecule, and enclose your detailed thinking process within <thinking></thinking> tags.
 Task: Predict whether the molecule can inhibit Beta-site Amyloid Precursor Protein Cleaving Enzyme 1 (BACE1).
 You will be provided with example molecules and their binary labels: Yes (inhibitor) or No (non-inhibitor).
 
@@ -27,8 +31,7 @@ Example output: Yes, 0.85
 
 
 Tox21_prompt_N_shot = """You are an expert chemist. Your task is to predict the property of a molecule based on its SMILES string representation.
-Do not provide any reasoning, explanation, or additional text. Strictly follow the required output format.
-
+Use chain-of-thought reasoning to analyze the target molecule, and enclose your detailed thinking process within <thinking></thinking> tags.
 Task: Predict whether the molecule is toxic.
 You will be provided with example molecules and their binary labels: Yes (toxic) or No (not toxic).
 
