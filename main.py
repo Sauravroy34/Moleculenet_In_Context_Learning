@@ -59,7 +59,7 @@ def metric_eval(task_type, df, dataset_name, model_name):
             y_true = task_df['true_label'].astype(float).tolist()
             y_pred = task_df['predicted'].fillna(0.0).astype(float).tolist()
             
-            rmse = mean_squared_error(y_true, y_pred, squared=False)
+            rmse = mean_squared_error(y_true, y_pred)
             rmse_list.append(rmse)
             
         metrics["rmse"] = sum(rmse_list) / len(rmse_list) if rmse_list else 0.0
@@ -80,12 +80,19 @@ def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realt
     
     train, valid, test = load_datsets(name)
     test_df = test.to_dataframe()
+    
+    print(test_df.columns)
+
     # Filter rows with at least one task weight > 0
     test_df = test_df[test_df["w"].apply(lambda x: any(w > 0 for w in (x if hasattr(x, '__iter__') else [x])))]
     
     if limit:
+        from sklearn.utils import shuffle
+        test_df = shuffle(test_df, random_state=SEED)
         test_df = test_df.head(limit)
-        
+
+
+
     model = LiteLLMModel(model_name=model_name, temperature=temperature)
     
     prediction_records = []
@@ -148,10 +155,3 @@ def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realt
         out_df = pd.DataFrame(prediction_records)
         metrics = metric_eval(task_type, out_df, name, model_name)
         return out_df, metrics
-
-
-if __name__ == "__main__":
-    # Example test
-    # df, metrics = single_run("bbbp", k=5, SEED=SEED, model_name="gpt-4o", mode="realtime", limit=3)
-    # print(metrics)
-    pass
