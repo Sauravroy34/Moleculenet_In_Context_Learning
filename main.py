@@ -67,7 +67,7 @@ def metric_eval(task_type, df, dataset_name, model_name):
     return metrics
 
 
-def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realtime", limit: int = None):
+def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realtime", limit: int = None, temperature: float = 0.0):
     """
     Run evaluation for a dataset using the specified model.
     mode can be 'realtime' or 'batch'.
@@ -86,7 +86,7 @@ def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realt
     if limit:
         test_df = test_df.head(limit)
         
-    model = LiteLLMModel(model_name=model_name)
+    model = LiteLLMModel(model_name=model_name, temperature=temperature)
     
     prediction_records = []
     batch_requests = []
@@ -135,9 +135,9 @@ def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realt
         batch_id = f"batch_{name}_k{k}_{int(time.time())}"
         provider = provider_of(model_name)
         if provider == "openai":
-            api_batch_id = submit_batch_openai(model_name, name, batch_requests, batch_id)
+            api_batch_id = submit_batch_openai(model_name, name, batch_requests, batch_id, temperature=temperature)
         elif provider == "anthropic":
-            api_batch_id = submit_batch_anthropic(model_name, name, batch_requests, batch_id)
+            api_batch_id = submit_batch_anthropic(model_name, name, batch_requests, batch_id, temperature=temperature)
         else:
             raise ValueError(f"Batch mode not supported for provider {provider}")
             

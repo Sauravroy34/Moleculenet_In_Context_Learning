@@ -83,7 +83,7 @@ class LiteLLMModel(ModelInterface):
         return ""
 
 
-def submit_batch_openai(model_name: str, dataset_name: str, requests: list, batch_id: str):
+def submit_batch_openai(model_name: str, dataset_name: str, requests: list, batch_id: str, temperature: float = 0.0):
     """Submit a batch job using OpenAI's Batch API."""
     client = OpenAI()
     
@@ -98,7 +98,7 @@ def submit_batch_openai(model_name: str, dataset_name: str, requests: list, batc
                 "body": {
                     "model": bare_model(model_name),
                     "messages": msgs,
-                    "temperature": 0.0,
+                    "temperature": temperature,
                 }
             }
             f.write(json.dumps(req) + "\n")
@@ -117,7 +117,7 @@ def submit_batch_openai(model_name: str, dataset_name: str, requests: list, batc
     return batch.id
 
 
-def submit_batch_anthropic(model_name: str, dataset_name: str, requests: list, batch_id: str):
+def submit_batch_anthropic(model_name: str, dataset_name: str, requests: list, batch_id: str, temperature: float = 0.0):
     """Submit a batch job using Anthropic's Message Batches API."""
     client = anthropic.Anthropic()
     
@@ -135,7 +135,7 @@ def submit_batch_anthropic(model_name: str, dataset_name: str, requests: list, b
                 "system": system,
                 "messages": [msgs[1]],
                 "max_tokens": max_tokens(model_name, task_keys(dataset_name)),
-                "temperature": 0.0
+                "temperature": temperature
             }
         }
         batch_requests.append(req)
