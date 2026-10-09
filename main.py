@@ -67,7 +67,7 @@ def metric_eval(task_type, df, dataset_name, model_name):
     return metrics
 
 
-def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realtime", limit: int = None, temperature: float = 0.0):
+def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realtime", limit: int = None, temperature: float = 0.0, use_reasoning: bool = True):
     """
     Run evaluation for a dataset using the specified model.
     mode can be 'realtime' or 'batch'.
@@ -102,7 +102,7 @@ def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realt
             true_labels = [true_labels]
             weights = [weights]
             
-        messages = build_messages(name, train, input_smiles, k, SEED)
+        messages = build_messages(name, train, input_smiles, k, SEED, use_reasoning=use_reasoning)
         
         if mode == "batch":
             batch_requests.append(messages)

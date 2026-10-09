@@ -67,7 +67,7 @@ def select_examples(dc_dataset, task_type, k, seed):
     return examples
 
 
-def build_messages(dataset_name, dc_dataset, input_smiles, k, seed):
+def build_messages(dataset_name, dc_dataset, input_smiles, k, seed, use_reasoning: bool = True):
     """OpenAI-format messages asking for the properties of test molecule, with k examples."""
     ds = DATASETS[dataset_name]
     keys = task_keys(dataset_name)
@@ -82,11 +82,16 @@ def build_messages(dataset_name, dc_dataset, input_smiles, k, seed):
         'For the molecule given by the user, predict:',
         *(f'- {key}: {desc}' for key, desc in zip(keys, ds['tasks'].values())),
         '',
-        f'Units: every value is the {CLASSIFICATION_UNIT}.' if is_cls else f"Units: {ds.get('unit', '')}.",
-        'Use chain-of-thought reasoning to analyze the target molecule, and enclose your detailed thinking process within <think></think> tags.',
-        f'After thinking, respond with a JSON object with the keys {", ".join(keys)} and numeric values, '
-        f'for example {json.dumps({key: 0.5 if is_cls else 0.0 for key in keys[:2]})}.'
+        f'Units: every value is the {CLASSIFICATION_UNIT}.' if is_cls else f"Units: {ds.get('unit', '')}."
     ]
+
+    if use_reasoning:
+        lines.append('Use chain-of-thought reasoning to analyze the target molecule, and enclose your detailed thinking process within <think></think> tags.')
+        lines.append(f'After thinking, respond with a JSON object with the keys {", ".join(keys)} and numeric values, ')
+    else:
+        lines.append(f'Respond with a JSON object with the keys {", ".join(keys)} and numeric values, ')
+
+    lines.append(f'for example {json.dumps({key: 0.5 if is_cls else 0.0 for key in keys[:2]})}.')
     system_parts = [{'type': 'text', 'text': '\n'.join(lines)}]
 
     if dc_dataset is not None:
