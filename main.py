@@ -10,7 +10,7 @@ from DataLoader.loader import load_datsets
 from Prompts.Dataset_task_map import DATASETS
 from Prompts.prompts import build_messages, parse_response
 from backends import LiteLLMModel, provider_of, submit_batch_openai, submit_batch_anthropic
-
+import numpy as np
 SEED = 42
 
 def metric_eval(task_type, df, dataset_name, model_name):
@@ -59,7 +59,7 @@ def metric_eval(task_type, df, dataset_name, model_name):
             y_true = task_df['true_label'].astype(float).tolist()
             y_pred = task_df['predicted'].fillna(0.0).astype(float).tolist()
             
-            rmse = mean_squared_error(y_true, y_pred)
+            rmse = np.mean(mean_squared_error(y_true, y_pred))
             rmse_list.append(rmse)
             
         metrics["rmse"] = sum(rmse_list) / len(rmse_list) if rmse_list else 0.0
@@ -155,3 +155,43 @@ def single_run(name: str, k: int, SEED: int, model_name: str, mode: str = "realt
         out_df = pd.DataFrame(prediction_records)
         metrics = metric_eval(task_type, out_df, name, model_name)
         return out_df, metrics
+
+
+
+OUTPUT_DIR = "output"
+
+# ... metric_eval and single_run stay exactly as they were ...
+
+
+def save_predictions(out_df, dataset_name, model_name, k, output_dir=OUTPUT_DIR):
+    """Save predictions DataFrame to output/<dataset>_<model>_k<k>.csv"""
+    os.makedirs(output_dir, exist_ok=True)
+    safe_model = model_name.replace("/", "_")
+    path = os.path.join(output_dir, f"{dataset_name}_{safe_model}_k{k}.csv")
+    out_df.to_csv(path, index=False)
+    return path
+
+
+def print_metrics_table(all_metrics):
+    """Print metrics for all datasets as one neat table."""
+    if not all_metrics:
+        print("No metrics to display.")
+        return
+
+    df = pd.DataFrame(all_metrics)
+    # Put identifying columns first
+    id_cols = [c for c in ["dataset", "model_name"] if c in df.columns]
+    metric_cols = [c for c in df.columns if c not in id_cols]
+    df = df[id_cols + metric_cols]
+
+    print("\n" + "=" * 70)
+    print("EVALUATION SUMMARY")
+    print("=" * 70)
+    print(df.to_string(index=False, float_format=lambda x: f"{x:.4f}", na_rep="-"))
+    print("=" * 70)
+
+    # Also save the summary
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    summary_path = os.path.join(OUTPUT_DIR, "metrics_summary.csv")
+    df.to_csv(summary_path, index=False)
+    print(f"Summary saved to {summary_path}")
